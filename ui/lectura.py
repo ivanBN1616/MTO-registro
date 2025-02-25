@@ -1,8 +1,8 @@
 import customtkinter as ctk
 from tkinter import ttk
 import tkinter as tk
-import tkinter.messagebox as MessageBox 
-from database.database import insertar_error, eliminar_error
+import tkinter.messagebox as MessageBox
+from database.database import insertar_error, eliminar_error, actualizar_error
 
 class LecturaFrame(ctk.CTkFrame):
     def __init__(self, master, conn, **kwargs):
@@ -16,6 +16,10 @@ class LecturaFrame(ctk.CTkFrame):
         search_frame = ctk.CTkFrame(self)
         search_frame.pack(side="top", fill="x", padx=5, pady=5)
 
+        # Botón hamburguesa para el menú desplegable
+        menu_button = ctk.CTkButton(search_frame, text="☰", width=30, height=30, command=self.show_menu)
+        menu_button.pack(side="left", padx=5)
+
         search_label = ctk.CTkLabel(search_frame, text="Buscar:")
         search_label.pack(side="left", padx=5)
 
@@ -25,17 +29,6 @@ class LecturaFrame(ctk.CTkFrame):
         # Botón Buscar
         buscar_btn = ctk.CTkButton(search_frame, text="Buscar", command=self.buscar_errores)
         buscar_btn.pack(side="left", padx=5)
-
-        # Botones Agregar y Eliminar, alineados a la derecha del Buscar
-        agregar_btn = ctk.CTkButton(search_frame, text="Agregar", command=self.abrir_ventana_agregar)
-        agregar_btn.pack(side="left", padx=5)
-
-        eliminar_btn = ctk.CTkButton(search_frame, text="Eliminar", command=self.eliminar_error)
-        eliminar_btn.pack(side="left", padx=5)
-
-        editar_btn = ctk.CTkButton(search_frame, text="Editar", command=self.editar_error)
-        editar_btn.pack(side="left", padx=5)
-
 
         # --- Treeview ---
         self.tree = ttk.Treeview(self, columns=("Num", "Pantalla", "Descripcion"), show='headings')
@@ -67,13 +60,23 @@ class LecturaFrame(ctk.CTkFrame):
             tag = 'gris_claro' if idx % 2 == 0 else ''  # Alternar el color de fondo
             self.tree.insert("", "end", iid=str(id_reg), values=(num, pantalla, descripcion), tags=(tag,))
 
+    def show_menu(self):
+        """Muestra el menú desplegable."""
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Agregar", command=self.abrir_ventana_agregar)
+        menu.add_command(label="Eliminar", command=self.eliminar_error)
+        #menu.add_command(label="Editar", command=self.editar_error)
+
+        # Posicionamos el menú debajo del botón de hamburguesa
+        menu.post(self.winfo_rootx() + 35, self.winfo_rooty() + 55)
+
     def buscar_errores(self):
         """Filtra los registros en el Treeview según el término de búsqueda."""
         busqueda = self.buscar_entry.get()
         cursor = self.conn.cursor()
         cursor.execute(''' 
             SELECT id, num, pantalla, descripcion FROM errores
-            WHERE num LIKE ? OR pantalla LIKE ? OR descripcion LIKE ?
+            WHERE num LIKE ? OR pantalla LIKE ? OR descripcion LIKE ? 
         ''', (f'%{busqueda}%', f'%{busqueda}%', f'%{busqueda}%'))
         registros = cursor.fetchall()
         for i in self.tree.get_children():
@@ -133,7 +136,7 @@ class LecturaFrame(ctk.CTkFrame):
         causa = self.entries["Causa"].get("1.0", "end-1c")  # Obtener texto completo de Text
         solucion = self.entries["Solución"].get("1.0", "end-1c")  # Obtener texto completo de Text
 
-        # Validar que no falte ningún dato (puedes ampliar con mensajes de error)
+        # Validar que no falte ningún dato
         if not all([num, pantalla, descripcion, causa, solucion]):
             return
 
@@ -141,7 +144,6 @@ class LecturaFrame(ctk.CTkFrame):
         insertar_error(self.conn, num, pantalla, descripcion, causa, solucion)
         ventana.destroy()
         self.cargar_todos()
-
 
     def ver_detalle(self, event):
         """Muestra una ventana con los detalles del error seleccionado."""
@@ -160,87 +162,20 @@ class LecturaFrame(ctk.CTkFrame):
             valor = ctk.CTkLabel(detalle_win, text=info)
             valor.grid(row=idx, column=1, sticky="w", padx=5, pady=5)
 
-    import tkinter.messagebox as MessageBox  # Importar messagebox
-
-    def editar_error(self):
-        """Abre una ventana para editar el error seleccionado en el Treeview."""
-        selected_item = self.tree.selection()
-        
-        if not selected_item:
-            MessageBox.showwarning("Selección requerida", "Por favor, selecciona un error para editar.")
-            return
-
-        # Obtener el ID del error seleccionado
-        error_id = selected_item[0]
-        
-        # Obtener los datos del error seleccionado
-        cursor = self.conn.cursor()
-        cursor.execute('SELECT num, pantalla, descripcion, causa, solucion FROM errores WHERE id = ?', (error_id,))
-        error_data = cursor.fetchone()
-
-        if error_data:
-            # Abrir la ventana emergente para editar
-            ventana = self.crear_ventana_editar(error_data, error_id)
-
-    def crear_ventana_editar(self, error_data, error_id):
-        """Crea y muestra la ventana emergente para editar un error."""
-        ventana = ctk.CTkToplevel(self)
-        ventana.title("Editar Error")
-        ventana.geometry("400x350")
-        
-        labels = ["Núm.", "Pantalla", "Descripción", "Causa", "Solución"]
-        self.entries = {}
-
-        for idx, (label_text, value) in enumerate(zip(labels, error_data)):
-            lbl = ctk.CTkLabel(ventana, text=label_text)
-            lbl.grid(row=idx, column=0, padx=10, pady=5, sticky="e")
-
-            entry = ctk.CTkEntry(ventana, width=250)
-            entry.insert(0, value)  # Precargar el valor
-            entry.grid(row=idx, column=1, padx=10, pady=5)
-            self.entries[label_text] = entry
-
-        guardar_btn = ctk.CTkButton(ventana, text="Guardar", command=lambda: self.guardar_edicion(ventana, error_id))
-        guardar_btn.grid(row=len(labels), column=0, columnspan=2, pady=10)
-
-    def guardar_edicion(self, ventana, error_id):
-        """Guarda los cambios en el error seleccionado."""
-        num = self.entries["Núm."].get()
-        pantalla = self.entries["Pantalla"].get()
-        descripcion = self.entries["Descripción"].get()
-        causa = self.entries["Causa"].get()
-        solucion = self.entries["Solución"].get()
-
-        # Validar que no falte ningún dato
-        if not all([num, pantalla, descripcion, causa, solucion]):
-            return
-
-        # Actualizar el error en la base de datos
-        cursor = self.conn.cursor()
-        cursor.execute('''UPDATE errores 
-                        SET num = ?, pantalla = ?, descripcion = ?, causa = ?, solucion = ? 
-                        WHERE id = ?''', (num, pantalla, descripcion, causa, solucion, error_id))
-        self.conn.commit()
-        
-        MessageBox.showinfo("Éxito", "Error actualizado correctamente.")
-        ventana.destroy()
-        self.cargar_todos()  # Recargar los datos en el Treeview
-
-
     def eliminar_error(self):
         """Elimina el error seleccionado en el Treeview."""
         selected_item = self.tree.selection()
-        
+
         if not selected_item:
             MessageBox.showwarning("Selección requerida", "Por favor, selecciona un error para eliminar.")
             return
 
         # Obtenemos el ID del error seleccionado, que es el iid
         error_id = selected_item[0]
-        
+
         # Mostrar el cuadro de confirmación
         confirmar = MessageBox.askyesno("Confirmar eliminación", "¿Estás seguro de que deseas eliminar este error?")
-        
+
         if confirmar:
             try:
                 # Llamar a la función de eliminación (deberías tener la lógica en database.py)
@@ -250,4 +185,71 @@ class LecturaFrame(ctk.CTkFrame):
             except Exception as e:
                 MessageBox.showerror("Error", f"No se pudo eliminar el error.\n{str(e)}")
 
+    def editar_error(self):
+        """Abre una ventana emergente para editar un error seleccionado."""
+        selected_item = self.tree.selection()
 
+        if not selected_item:
+            MessageBox.showwarning("Selección requerida", "Por favor, selecciona un error para editar.")
+            return
+
+        # Si se ha seleccionado un elemento, proceder con la edición
+        item = selected_item[0]
+        error_id = int(item)
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM errores WHERE id = ?', (error_id,))
+        detalle = cursor.fetchone()
+
+        if not detalle:
+            MessageBox.showerror("Error", "No se encontraron detalles para este error.")
+            return
+
+        # Abrir ventana emergente para editar
+        ventana = ctk.CTkToplevel(self)
+        ventana.title("Editar Error")
+
+        labels = ["Núm.", "Pantalla", "Descripción", "Causa", "Solución"]
+        self.entries = {}
+
+        for idx, label_text in enumerate(labels):
+            lbl = ctk.CTkLabel(ventana, text=label_text)
+            lbl.grid(row=idx, column=0, padx=10, pady=5, sticky="e")
+
+            # Para Causa y Solución usar Text en lugar de Entry
+            if label_text in ["Causa", "Solución"]:
+                text_box = ctk.CTkTextbox(ventana, width=250, height=80)
+                text_box.grid(row=idx, column=1, padx=10, pady=5)
+                self.entries[label_text] = text_box
+            else:
+                entry = ctk.CTkEntry(ventana, width=250)
+                entry.grid(row=idx, column=1, padx=10, pady=5)
+                self.entries[label_text] = entry
+
+        # Rellenar con los datos existentes
+        for idx, label_text in enumerate(labels):
+            if label_text in ["Causa", "Solución"]:
+                self.entries[label_text].insert("1.0", detalle[idx + 3])  # Causa y Solución empiezan desde el índice 3
+            else:
+                self.entries[label_text].insert(0, detalle[idx + 1])  # Para los demás, insertamos en el índice correspondiente
+
+        guardar_btn = ctk.CTkButton(ventana, text="Guardar", 
+                                command=lambda: self.guardar_edicion(ventana, error_id))
+        guardar_btn.grid(row=len(labels), column=0, columnspan=2, pady=10)
+
+
+    def guardar_edicion(self, ventana, error_id):
+        """Guarda las ediciones de un error seleccionado."""
+        num = self.entries["Núm."].get()
+        pantalla = self.entries["Pantalla"].get()
+        descripcion = self.entries["Descripción"].get()
+        causa = self.entries["Causa"].get("1.0", "end-1c")
+        solucion = self.entries["Solución"].get("1.0", "end-1c")
+
+        # Validar que no falte ningún dato
+        if not all([num, pantalla, descripcion, causa, solucion]):
+            return
+
+        # Llamar a la función para actualizar los datos en la base de datos
+        actualizar_error(self.conn, error_id, num, pantalla, descripcion, causa, solucion)
+        ventana.destroy()
+        self.cargar_todos()

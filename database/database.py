@@ -25,3 +25,15 @@ def editar_error(conn, error_id, num, pantalla, descripcion, causa, solucion):
         WHERE id = ?
     ''', (num, pantalla, descripcion, causa, solucion, error_id))
     conn.commit()
+
+
+ 
+def actualizar_error(conn, error_id, num, pantalla, descripcion, causa, solucion):
+    """Actualiza un error en la base de datos."""
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE errores
+        SET num = ?, pantalla = ?, descripcion = ?, causa = ?, solucion = ?
+        WHERE id = ?
+    ''', (num, pantalla, descripcion, causa, solucion, error_id))
+    conn.commit()
