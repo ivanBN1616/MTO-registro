@@ -1,5 +1,3 @@
-# utils/helpers.py
-
-def formatear_texto(texto):
-    # Ejemplo: función para capitalizar el texto
-    return texto.capitalize()
+def ajustar_texto(texto, ancho=40):
+    import textwrap
+    return "\n".join(textwrap.wrap(texto, width=ancho))
