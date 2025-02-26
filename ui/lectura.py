@@ -5,6 +5,9 @@ import tkinter.messagebox as MessageBox
 import tkinter.filedialog as filedialog
 from database.database import insertar_error, eliminar_error, actualizar_error
 from utils.excel_loader import cargar_datos_desde_excel
+from ui.agregar import AgregarErrorWindow
+import sqlite3
+
 
 class LecturaFrame(ctk.CTkFrame):
     def __init__(self, master, conn, **kwargs):
@@ -25,16 +28,30 @@ class LecturaFrame(ctk.CTkFrame):
         search_label = ctk.CTkLabel(search_frame, text="Buscar:")
         search_label.pack(side="left", padx=5)
 
-        self.buscar_entry = ctk.CTkEntry(search_frame, width=300)
+        self.buscar_entry = ctk.CTkEntry(search_frame, width=200)
         self.buscar_entry.pack(side="left", padx=5)
 
         # Botón Buscar
-        buscar_btn = ctk.CTkButton(search_frame, text="Buscar", command=self.buscar_errores)
+        buscar_btn = ctk.CTkButton(search_frame, text="Buscar", width=80, command=self.buscar_errores)
         buscar_btn.pack(side="left", padx=5)
 
-        # --- Treeview ---
-        self.tree = ttk.Treeview(self, columns=("Num", "Pantalla", "Descripcion"), show='headings')
-        self.tree.pack(side="top", fill="both", expand=True, padx=5, pady=5)
+        # --- Treeview con Scroll ---
+        self.tree_frame = ctk.CTkFrame(self)
+        self.tree_frame.pack(side="top", fill="both", expand=True, padx=5, pady=5)
+
+        # Treeview
+        self.tree = ttk.Treeview(self.tree_frame, columns=("Num", "Pantalla", "Descripcion"), show='headings')
+        self.tree.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+
+        # Estilo del Scrollbar
+        style = ttk.Style(self)
+        style.theme_use("clam")
+        style.configure("Vertical.TScrollbar", gripcount=0, background="gray", troughcolor="gray", sliderrelief="flat", slidercolor="gray")
+
+        # Scrollbar
+        self.scrollbar = ttk.Scrollbar(self.tree_frame, orient="vertical", command=self.tree.yview, style="Vertical.TScrollbar")
+        self.scrollbar.pack(side="right", fill="y")
+        self.tree.configure(yscrollcommand=self.scrollbar.set)
 
         # Configuración de cabeceras del Treeview
         self.tree.heading("Num", text="Núm.")
@@ -50,7 +67,7 @@ class LecturaFrame(ctk.CTkFrame):
 
         self.tree.bind("<Double-1>", self.ver_detalle)
 
-        cargar_excel_btn = ctk.CTkButton(search_frame, text="Excel", command=self.cargar_desde_excel)
+        cargar_excel_btn = ctk.CTkButton(search_frame, text="Excel", width=80, command=self.cargar_desde_excel)
         cargar_excel_btn.pack(side="left", padx=5)
 
     def cargar_desde_excel(self):
@@ -60,7 +77,7 @@ class LecturaFrame(ctk.CTkFrame):
             return
 
         cargar_datos_desde_excel(self.conn, self.cargar_todos, file_path)
-    
+
     def cargar_todos(self):
         """Carga todos los registros de la base de datos en el Treeview."""
         cursor = self.conn.cursor()
@@ -101,14 +118,14 @@ class LecturaFrame(ctk.CTkFrame):
 
     def abrir_ventana_agregar(self):
         """Abre una ventana emergente para agregar un nuevo error."""
-        ventana = ctk.CTkToplevel(self)
+        ventana = ctk.CTkToplevel(self.master)
         ventana.title("Agregar Nuevo Error")
 
         # Obtener dimensiones de la ventana principal
-        master_width = self.winfo_width()
-        master_height = self.winfo_height()
-        master_x = self.winfo_x()
-        master_y = self.winfo_y()
+        master_width = self.master.winfo_width()
+        master_height = self.master.winfo_height()
+        master_x = self.master.winfo_x()
+        master_y = self.master.winfo_y()
 
         # Calcular la posición al lado de la ventana principal
         ventana_width = 400
@@ -121,9 +138,11 @@ class LecturaFrame(ctk.CTkFrame):
         # Asegurarse de que la ventana emergente esté en primer plano
         ventana.lift()
 
+        # Definir las etiquetas para los campos
         labels = ["Núm.", "Pantalla", "Descripción", "Causa", "Solución"]
         self.entries = {}
 
+        # Crear los campos de entrada y las etiquetas
         for idx, label_text in enumerate(labels):
             lbl = ctk.CTkLabel(ventana, text=label_text)
             lbl.grid(row=idx, column=0, padx=10, pady=5, sticky="e")
@@ -138,25 +157,58 @@ class LecturaFrame(ctk.CTkFrame):
                 entry.grid(row=idx, column=1, padx=10, pady=5)
                 self.entries[label_text] = entry
 
+        # Botón de guardar
         guardar_btn = ctk.CTkButton(ventana, text="Guardar", command=lambda: self.guardar_error(ventana))
         guardar_btn.grid(row=len(labels), column=0, columnspan=2, pady=10)
 
     def guardar_error(self, ventana):
-        """Guarda los datos ingresados en la ventana emergente en la base de datos."""
+        """Guarda los datos introducidos y cierra la ventana emergente."""
+
+        # Obtener los valores de las entradas
         num = self.entries["Núm."].get()
         pantalla = self.entries["Pantalla"].get()
         descripcion = self.entries["Descripción"].get()
-        causa = self.entries["Causa"].get("1.0", "end-1c")  # Obtener texto completo de Text
-        solucion = self.entries["Solución"].get("1.0", "end-1c")  # Obtener texto completo de Text
+        causa = self.entries["Causa"].get("1.0", "end-1c")  # Obtener texto de Text
+        solucion = self.entries["Solución"].get("1.0", "end-1c")  # Obtener texto de Text
 
-        # Validar que no falte ningún dato
-        if not all([num, pantalla, descripcion, causa, solucion]):
-            return
+        # Insertar los datos en la base de datos (por ejemplo, SQLite)
+        self.insertar_en_base_datos(num, pantalla, descripcion, causa, solucion)
 
-        # Llamar a la función del módulo database para insertar el error
-        insertar_error(self.conn, num, pantalla, descripcion, causa, solucion)
+        # Cerrar la ventana emergente
         ventana.destroy()
-        self.cargar_todos()
+
+    def insertar_en_base_datos(self, num, pantalla, descripcion, causa, solucion):
+        """Inserta los datos en la base de datos."""
+        try:
+            # Conectar a la base de datos (asegúrate de que la base de datos existe)
+            conn = sqlite3.connect("errores.db")
+            cursor = conn.cursor()
+
+            # Crear la tabla si no existe
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS errores (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    num TEXT,
+                    pantalla TEXT,
+                    descripcion TEXT,
+                    causa TEXT,
+                    solucion TEXT
+                )
+            ''')
+
+            # Insertar el nuevo error en la base de datos
+            cursor.execute('''
+                INSERT INTO errores (num, pantalla, descripcion, causa, solucion)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (num, pantalla, descripcion, causa, solucion))
+
+            # Guardar los cambios y cerrar la conexión
+            conn.commit()
+            conn.close()
+
+            print("Error guardado exitosamente en la base de datos.")
+        except Exception as e:
+            print(f"Error al guardar en la base de datos: {e}")
 
     def ver_detalle(self, event):
         """Muestra una ventana con los detalles del error seleccionado."""
@@ -183,17 +235,13 @@ class LecturaFrame(ctk.CTkFrame):
             MessageBox.showwarning("Selección requerida", "Por favor, selecciona un error para eliminar.")
             return
 
-        # Obtenemos el ID del error seleccionado, que es el iid
         error_id = selected_item[0]
 
-        # Mostrar el cuadro de confirmación
         confirmar = MessageBox.askyesno("Confirmar eliminación", "¿Estás seguro de que deseas eliminar este error?")
 
         if confirmar:
             try:
-                # Llamar a la función de eliminación (deberías tener la lógica en database.py)
                 eliminar_error(self.conn, error_id)  # Asegúrate de que esta función esté implementada correctamente en database.py
-                # Recargar la lista de errores
                 self.cargar_todos()
             except Exception as e:
                 MessageBox.showerror("Error", f"No se pudo eliminar el error.\n{str(e)}")
@@ -209,25 +257,16 @@ class LecturaFrame(ctk.CTkFrame):
         error_id = int(selected_item[0])
         cursor = self.conn.cursor()
         cursor.execute('SELECT id, num, pantalla, descripcion, causa, solucion FROM errores WHERE id = ?', (error_id,))
-        detalle = cursor.fetchone()  # Devuelve una tupla o None
-
-        # 📌 Depuración: Verificar qué devuelve la consulta
-        print(f"Detalles obtenidos de la BD: {detalle}")
+        detalle = cursor.fetchone()
 
         if not detalle:
             MessageBox.showerror("Error", "No se encontraron detalles para este error.")
             return
 
-        # 📌 Asegurar que hay suficientes datos en la tupla
-        if len(detalle) < 6:
-            MessageBox.showerror("Error", "Los datos del error están incompletos en la base de datos.")
-            return
-
-        # 📌 Crear la ventana emergente con tamaño adecuado
         ventana = ctk.CTkToplevel(self)
         ventana.title("Editar Error")
-        ventana.geometry("450x400")  # Un poco más grande para mejor visualización
-        ventana.resizable(False, False)  # Evitamos que el usuario la haga más pequeña
+        ventana.geometry("450x400")
+        ventana.resizable(False, False)
 
         labels = ["Núm.", "Pantalla", "Descripción", "Causa", "Solución"]
         self.entries = {}
@@ -236,12 +275,12 @@ class LecturaFrame(ctk.CTkFrame):
             lbl = ctk.CTkLabel(ventana, text=label_text)
             lbl.grid(row=idx, column=0, padx=10, pady=5, sticky="e")
 
-            valor = detalle[idx + 1] if idx + 1 < len(detalle) else ""  # Evita IndexError
+            valor = detalle[idx + 1] if idx + 1 < len(detalle) else ""
 
             if label_text in ["Causa", "Solución"]:
                 text_box = ctk.CTkTextbox(ventana, width=250, height=80, wrap="word")
                 text_box.grid(row=idx, column=1, padx=10, pady=5, sticky="ew")
-                text_box.insert("1.0", valor)  # Inserta el valor sin IndexError
+                text_box.insert("1.0", valor)
                 text_box.configure(state="normal")
                 self.entries[label_text] = text_box
             else:
@@ -250,16 +289,10 @@ class LecturaFrame(ctk.CTkFrame):
                 entry.insert(0, valor)
                 self.entries[label_text] = entry
 
-        # 📌 Botón de Guardar
-        guardar_btn = ctk.CTkButton(ventana, text="Guardar", 
-                                    command=lambda: self.guardar_edicion(ventana, error_id), width=100, height=30)
+        guardar_btn = ctk.CTkButton(ventana, text="Guardar", command=lambda: self.guardar_edicion(ventana, error_id), width=100, height=30)
         guardar_btn.grid(row=len(labels), column=0, columnspan=2, pady=10, padx=10, sticky="e")
 
         ventana.grid_columnconfigure(1, weight=1)
-
-
-
-
 
     def guardar_edicion(self, ventana, error_id):
         """Guarda las ediciones de un error seleccionado."""
@@ -269,11 +302,9 @@ class LecturaFrame(ctk.CTkFrame):
         causa = self.entries["Causa"].get("1.0", "end-1c")
         solucion = self.entries["Solución"].get("1.0", "end-1c")
 
-        # Validar que no falte ningún dato
         if not all([num, pantalla, descripcion, causa, solucion]):
             return
 
-        # Llamar a la función para actualizar los datos en la base de datos
         actualizar_error(self.conn, error_id, num, pantalla, descripcion, causa, solucion)
         ventana.destroy()
         self.cargar_todos()
