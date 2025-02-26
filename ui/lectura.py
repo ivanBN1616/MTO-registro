@@ -2,7 +2,9 @@ import customtkinter as ctk
 from tkinter import ttk
 import tkinter as tk
 import tkinter.messagebox as MessageBox
+import tkinter.filedialog as filedialog
 from database.database import insertar_error, eliminar_error, actualizar_error
+from utils.excel_loader import cargar_datos_desde_excel
 
 class LecturaFrame(ctk.CTkFrame):
     def __init__(self, master, conn, **kwargs):
@@ -48,6 +50,17 @@ class LecturaFrame(ctk.CTkFrame):
 
         self.tree.bind("<Double-1>", self.ver_detalle)
 
+        cargar_excel_btn = ctk.CTkButton(search_frame, text="Excel", command=self.cargar_desde_excel)
+        cargar_excel_btn.pack(side="left", padx=5)
+
+    def cargar_desde_excel(self):
+        """Carga datos desde un archivo Excel a la base de datos."""
+        file_path = filedialog.askopenfilename(filetypes=[("Archivos Excel", "*.xlsx")])
+        if not file_path:
+            return
+
+        cargar_datos_desde_excel(self.conn, self.cargar_todos, file_path)
+    
     def cargar_todos(self):
         """Carga todos los registros de la base de datos en el Treeview."""
         cursor = self.conn.cursor()
@@ -65,7 +78,7 @@ class LecturaFrame(ctk.CTkFrame):
         menu = tk.Menu(self, tearoff=0)
         menu.add_command(label="Agregar", command=self.abrir_ventana_agregar)
         menu.add_command(label="Eliminar", command=self.eliminar_error)
-        #menu.add_command(label="Editar", command=self.editar_error)
+        menu.add_command(label="Editar", command=self.editar_error)
 
         # Posicionamos el menú debajo del botón de hamburguesa
         menu.post(self.winfo_rootx() + 35, self.winfo_rooty() + 55)
@@ -193,20 +206,28 @@ class LecturaFrame(ctk.CTkFrame):
             MessageBox.showwarning("Selección requerida", "Por favor, selecciona un error para editar.")
             return
 
-        # Si se ha seleccionado un elemento, proceder con la edición
-        item = selected_item[0]
-        error_id = int(item)
+        error_id = int(selected_item[0])
         cursor = self.conn.cursor()
-        cursor.execute('SELECT * FROM errores WHERE id = ?', (error_id,))
-        detalle = cursor.fetchone()
+        cursor.execute('SELECT id, num, pantalla, descripcion, causa, solucion FROM errores WHERE id = ?', (error_id,))
+        detalle = cursor.fetchone()  # Devuelve una tupla o None
+
+        # 📌 Depuración: Verificar qué devuelve la consulta
+        print(f"Detalles obtenidos de la BD: {detalle}")
 
         if not detalle:
             MessageBox.showerror("Error", "No se encontraron detalles para este error.")
             return
 
-        # Abrir ventana emergente para editar
+        # 📌 Asegurar que hay suficientes datos en la tupla
+        if len(detalle) < 6:
+            MessageBox.showerror("Error", "Los datos del error están incompletos en la base de datos.")
+            return
+
+        # 📌 Crear la ventana emergente con tamaño adecuado
         ventana = ctk.CTkToplevel(self)
         ventana.title("Editar Error")
+        ventana.geometry("450x400")  # Un poco más grande para mejor visualización
+        ventana.resizable(False, False)  # Evitamos que el usuario la haga más pequeña
 
         labels = ["Núm.", "Pantalla", "Descripción", "Causa", "Solución"]
         self.entries = {}
@@ -215,26 +236,29 @@ class LecturaFrame(ctk.CTkFrame):
             lbl = ctk.CTkLabel(ventana, text=label_text)
             lbl.grid(row=idx, column=0, padx=10, pady=5, sticky="e")
 
-            # Para Causa y Solución usar Text en lugar de Entry
+            valor = detalle[idx + 1] if idx + 1 < len(detalle) else ""  # Evita IndexError
+
             if label_text in ["Causa", "Solución"]:
-                text_box = ctk.CTkTextbox(ventana, width=250, height=80)
-                text_box.grid(row=idx, column=1, padx=10, pady=5)
+                text_box = ctk.CTkTextbox(ventana, width=250, height=80, wrap="word")
+                text_box.grid(row=idx, column=1, padx=10, pady=5, sticky="ew")
+                text_box.insert("1.0", valor)  # Inserta el valor sin IndexError
+                text_box.configure(state="normal")
                 self.entries[label_text] = text_box
             else:
                 entry = ctk.CTkEntry(ventana, width=250)
-                entry.grid(row=idx, column=1, padx=10, pady=5)
+                entry.grid(row=idx, column=1, padx=10, pady=5, sticky="ew")
+                entry.insert(0, valor)
                 self.entries[label_text] = entry
 
-        # Rellenar con los datos existentes
-        for idx, label_text in enumerate(labels):
-            if label_text in ["Causa", "Solución"]:
-                self.entries[label_text].insert("1.0", detalle[idx + 3])  # Causa y Solución empiezan desde el índice 3
-            else:
-                self.entries[label_text].insert(0, detalle[idx + 1])  # Para los demás, insertamos en el índice correspondiente
-
+        # 📌 Botón de Guardar
         guardar_btn = ctk.CTkButton(ventana, text="Guardar", 
-                                command=lambda: self.guardar_edicion(ventana, error_id))
-        guardar_btn.grid(row=len(labels), column=0, columnspan=2, pady=10)
+                                    command=lambda: self.guardar_edicion(ventana, error_id), width=100, height=30)
+        guardar_btn.grid(row=len(labels), column=0, columnspan=2, pady=10, padx=10, sticky="e")
+
+        ventana.grid_columnconfigure(1, weight=1)
+
+
+
 
 
     def guardar_edicion(self, ventana, error_id):
