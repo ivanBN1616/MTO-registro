@@ -31,7 +31,7 @@ class LecturaFrame(ctk.CTkFrame):
         # Botón para seleccionar base de datos
         self.db_selector = ctk.CTkOptionMenu(
             search_frame, 
-            values=["lenze9300.db", "lenze8200.db"], 
+            values=["lenze9300.db", "lenze8200.db", "lenze8400.db"], 
             command=self.cambiar_base_datos
         )
         self.db_selector.pack(side="left", padx=5)
