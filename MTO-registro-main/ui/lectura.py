@@ -6,8 +6,6 @@ import tkinter.filedialog as filedialog
 from database.database import insertar_error, eliminar_error, actualizar_error
 from utils.excel_loader import cargar_datos_desde_excel
 from ui.agregar import AgregarErrorWindow
-from config import DATABASE_NAME_2
-
 import sqlite3
 
 
@@ -26,15 +24,6 @@ class LecturaFrame(ctk.CTkFrame):
         # Botón hamburguesa para el menú desplegable
         menu_button = ctk.CTkButton(search_frame, text="☰", width=30, height=30, command=self.show_menu)
         menu_button.pack(side="left", padx=5)
-
-
-        # Botón para seleccionar base de datos
-        self.db_selector = ctk.CTkOptionMenu(
-            search_frame, 
-            values=["lenze9300.db", "lenze8200.db"], 
-            command=self.cambiar_base_datos
-        )
-        self.db_selector.pack(side="left", padx=5)
 
         search_label = ctk.CTkLabel(search_frame, text="Buscar:")
         search_label.pack(side="left", padx=5)
@@ -80,15 +69,6 @@ class LecturaFrame(ctk.CTkFrame):
 
         cargar_excel_btn = ctk.CTkButton(search_frame, text="Excel", width=80, command=self.cargar_desde_excel)
         cargar_excel_btn.pack(side="left", padx=5)
-
-    def cambiar_base_datos(self, db_name):
-        """Cambiar la base de datos seleccionada y recargar los datos."""
-        try:
-            self.conn = sqlite3.connect(db_name)
-            self.cargar_todos()
-            print(f"Conectado a la base de datos: {db_name}")
-        except Exception as e:
-            MessageBox.showerror("Error", f"No se pudo conectar a la base de datos: {e}")
 
     def cargar_desde_excel(self):
         """Carga datos desde un archivo Excel a la base de datos."""
@@ -191,27 +171,30 @@ class LecturaFrame(ctk.CTkFrame):
         causa = self.entries["Causa"].get("1.0", "end-1c")  # Obtener texto de Text
         solucion = self.entries["Solución"].get("1.0", "end-1c")  # Obtener texto de Text
 
-        # Validar que todos los campos están completos
-        if not all([num, pantalla, descripcion, causa, solucion]):
-            MessageBox.showwarning("Campos incompletos", "Por favor, completa todos los campos.")
-            return
-
-        # Determinar qué base de datos usar (puedes poner tu lógica aquí, por ejemplo, para elegir entre 2 bases)
-        conn_to_use = self.conn  # Asumiendo que `self.conn` es la conexión a la base de datos principal
-        if DATABASE_NAME_2:  # Verifica si quieres usar la segunda base de datos
-            conn_to_use = sqlite3.connect(DATABASE_NAME_2)
-
-        # Insertar los datos en la base de datos correcta
-        self.insertar_en_base_datos(num, pantalla, descripcion, causa, solucion, conn_to_use)
+        # Insertar los datos en la base de datos (por ejemplo, SQLite)
+        self.insertar_en_base_datos(num, pantalla, descripcion, causa, solucion)
 
         # Cerrar la ventana emergente
         ventana.destroy()
 
-
-    def insertar_en_base_datos(self, num, pantalla, descripcion, causa, solucion, conn):
+    def insertar_en_base_datos(self, num, pantalla, descripcion, causa, solucion):
         """Inserta los datos en la base de datos."""
         try:
+            # Conectar a la base de datos (asegúrate de que la base de datos existe)
+            conn = sqlite3.connect("errores.db")
             cursor = conn.cursor()
+
+            # Crear la tabla si no existe
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS errores (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    num TEXT,
+                    pantalla TEXT,
+                    descripcion TEXT,
+                    causa TEXT,
+                    solucion TEXT
+                )
+            ''')
 
             # Insertar el nuevo error en la base de datos
             cursor.execute('''
@@ -219,12 +202,13 @@ class LecturaFrame(ctk.CTkFrame):
                 VALUES (?, ?, ?, ?, ?)
             ''', (num, pantalla, descripcion, causa, solucion))
 
-            # Guardar los cambios
+            # Guardar los cambios y cerrar la conexión
             conn.commit()
+            conn.close()
+
             print("Error guardado exitosamente en la base de datos.")
         except Exception as e:
             print(f"Error al guardar en la base de datos: {e}")
-
 
     def ver_detalle(self, event):
         """Muestra una ventana con los detalles del error seleccionado."""
