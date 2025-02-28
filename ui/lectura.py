@@ -81,14 +81,22 @@ class LecturaFrame(ctk.CTkFrame):
         cargar_excel_btn = ctk.CTkButton(search_frame, text="Excel", width=80, command=self.cargar_desde_excel)
         cargar_excel_btn.pack(side="left", padx=5)
 
+        boton_refrescar = ctk.CTkButton(search_frame, text="Refrescar", width=80, command=self.cargar_todos)
+        boton_refrescar.pack(side="left", padx=5, pady=5)
+
+
     def cambiar_base_datos(self, db_name):
-        """Cambiar la base de datos seleccionada y recargar los datos."""
+        """Cambia la base de datos y recarga los datos en la interfaz."""
         try:
-            self.conn = sqlite3.connect(db_name)
-            self.cargar_todos()
+            if hasattr(self, 'conn') and self.conn:
+                self.conn.close()  # Cerrar la conexión anterior
+            
+            self.conn = sqlite3.connect(db_name)  # Crear una nueva conexión
+            self.cargar_todos()  # Recargar los datos en la tabla
             print(f"Conectado a la base de datos: {db_name}")
         except Exception as e:
             MessageBox.showerror("Error", f"No se pudo conectar a la base de datos: {e}")
+
 
     def cargar_desde_excel(self):
         """Carga datos desde un archivo Excel a la base de datos."""
@@ -109,6 +117,7 @@ class LecturaFrame(ctk.CTkFrame):
             id_reg, num, pantalla, descripcion = reg
             tag = 'gris_claro' if idx % 2 == 0 else ''  # Alternar el color de fondo
             self.tree.insert("", "end", iid=str(id_reg), values=(num, pantalla, descripcion), tags=(tag,))
+            self.tree.yview_moveto(0)  # Mueve el scroll al inicio
 
     def show_menu(self):
         """Muestra el menú desplegable."""
@@ -182,45 +191,35 @@ class LecturaFrame(ctk.CTkFrame):
         guardar_btn.grid(row=len(labels), column=0, columnspan=2, pady=10)
 
     def guardar_error(self, ventana):
-        """Guarda los datos introducidos y cierra la ventana emergente."""
-
-        # Obtener los valores de las entradas
+        """Guarda los datos introducidos en la base de datos activa."""
         num = self.entries["Núm."].get()
         pantalla = self.entries["Pantalla"].get()
         descripcion = self.entries["Descripción"].get()
-        causa = self.entries["Causa"].get("1.0", "end-1c")  # Obtener texto de Text
-        solucion = self.entries["Solución"].get("1.0", "end-1c")  # Obtener texto de Text
+        causa = self.entries["Causa"].get("1.0", "end-1c")
+        solucion = self.entries["Solución"].get("1.0", "end-1c")
 
-        # Validar que todos los campos están completos
         if not all([num, pantalla, descripcion, causa, solucion]):
             MessageBox.showwarning("Campos incompletos", "Por favor, completa todos los campos.")
             return
 
-        # Determinar qué base de datos usar (puedes poner tu lógica aquí, por ejemplo, para elegir entre 2 bases)
-        conn_to_use = self.conn  # Asumiendo que `self.conn` es la conexión a la base de datos principal
-        if DATABASE_NAME_2:  # Verifica si quieres usar la segunda base de datos
-            conn_to_use = sqlite3.connect(DATABASE_NAME_2)
+        self.insertar_en_base_datos(num, pantalla, descripcion, causa, solucion, self.conn)  # Usar self.conn
 
-        # Insertar los datos en la base de datos correcta
-        self.insertar_en_base_datos(num, pantalla, descripcion, causa, solucion, conn_to_use)
-
-        # Cerrar la ventana emergente
         ventana.destroy()
+        self.cargar_todos()  # Recargar la tabla después de agregar
+
 
 
     def insertar_en_base_datos(self, num, pantalla, descripcion, causa, solucion, conn):
         """Inserta los datos en la base de datos."""
         try:
             cursor = conn.cursor()
-
-            # Insertar el nuevo error en la base de datos
             cursor.execute('''
                 INSERT INTO errores (num, pantalla, descripcion, causa, solucion)
                 VALUES (?, ?, ?, ?, ?)
             ''', (num, pantalla, descripcion, causa, solucion))
 
-            # Guardar los cambios
             conn.commit()
+            cursor.close()  # Cierra el cursor
             print("Error guardado exitosamente en la base de datos.")
         except Exception as e:
             print(f"Error al guardar en la base de datos: {e}")
@@ -234,14 +233,54 @@ class LecturaFrame(ctk.CTkFrame):
         cursor.execute('SELECT * FROM errores WHERE id = ?', (error_id,))
         detalle = cursor.fetchone()
 
+        # Crear una nueva ventana
         detalle_win = ctk.CTkToplevel(self)
         detalle_win.title("Detalle del Error")
+        
+        # Establecer tamaño inicial y color de fondo
+        detalle_win.geometry("800x500")
+        detalle_win.configure(bg="#f5f5f5")  # Fondo gris claro
+
+        # Etiquetas para los campos
         labels = ["Núm.", "Pantalla", "Descripción", "Causa", "Solución"]
-        for idx, info in enumerate(detalle[1:]):  # Omitir id
-            lbl = ctk.CTkLabel(detalle_win, text=f"{labels[idx]}:")
-            lbl.grid(row=idx, column=0, sticky="e", padx=5, pady=5)
-            valor = ctk.CTkLabel(detalle_win, text=info)
-            valor.grid(row=idx, column=1, sticky="w", padx=5, pady=5)
+        
+        for idx, info in enumerate(detalle[1:]):  # Omitir el id
+            # Etiqueta para el nombre del campo
+            lbl = ctk.CTkLabel(detalle_win, text=f"{labels[idx]}:", font=("Arial", 12, "bold"))
+            lbl.grid(row=idx, column=0, sticky="e", padx=20, pady=10)
+
+            # Valor del campo, usando etiquetas para valores
+            valor = ctk.CTkLabel(detalle_win, text=info, font=("Arial", 12), anchor="w", wraplength=600)
+            valor.grid(row=idx, column=1, sticky="w", padx=20, pady=10)
+
+            # Si el campo es "Causa" o "Solución", aseguramos que el texto largo se ajuste correctamente
+            if labels[idx] in ["Causa", "Solución"]:
+                valor.configure(wraplength=600)  # Ajustar el largo máximo de cada línea
+
+            # Reajustamos la columna para que se expanda en función del contenido
+            detalle_win.grid_columnconfigure(1, weight=1, uniform="column1")
+
+        # Botón de cerrar
+        cerrar_btn = ctk.CTkButton(detalle_win, text="Cerrar", command=detalle_win.destroy, width=100)
+        cerrar_btn.grid(row=len(labels), column=0, columnspan=2, pady=20, padx=10)
+
+        # Asegurar que la ventana de detalles esté al frente y no sea redimensionable
+        detalle_win.resizable(True, True)  # Permitir redimensionar
+        detalle_win.lift()  # Asegura que la ventana emergente esté al frente
+        detalle_win.focus_set()  # Focaliza la ventana emergente
+
+        # Ajustar el tamaño de las filas y columnas para que se adapten correctamente
+        detalle_win.grid_rowconfigure(len(labels), weight=1)
+        detalle_win.grid_columnconfigure(0, weight=1)
+        detalle_win.grid_columnconfigure(1, weight=3)
+
+        # Actualizar la ventana para ajustarse al contenido
+        detalle_win.update_idletasks()
+
+        # Establecer un tamaño mínimo para la ventana
+        detalle_win.geometry(f"{detalle_win.winfo_width()}x{detalle_win.winfo_height()}")
+
+
 
     def eliminar_error(self):
         """Elimina el error seleccionado en el Treeview."""

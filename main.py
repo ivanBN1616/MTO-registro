@@ -13,7 +13,7 @@ def main():
     # Crear la ventana principal
     app = ctk.CTk()
     app.title("Registro de Errores - Lenze")
-    app.geometry("700x400")
+    app.geometry("750x400")
 
     # Insertar el frame principal de lectura
     lectura_frame = LecturaFrame(app, conn)
