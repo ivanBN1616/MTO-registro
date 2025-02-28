@@ -1,5 +1,12 @@
 import sqlite3
 
+
+def obtener_error_por_id(conn, error_id):
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM errores WHERE id = ?', (error_id,))
+    return cursor.fetchone()  # Retorna una tupla con los datos del error
+    
+
 # Función para insertar un nuevo error
 def insertar_error(conn, num, pantalla, descripcion, causa, solucion):
     cursor = conn.cursor()

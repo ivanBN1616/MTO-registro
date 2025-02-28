@@ -1,7 +1,8 @@
 import customtkinter as ctk
+from tkinter import messagebox
 
 def ver_detalle(parent, tree, conn):
-    """Muestra una ventana con los detalles del error seleccionado."""
+    """Muestra una ventana con los detalles del error seleccionado y permite editar en la misma ventana."""
     try:
         # Verificar si se seleccionó un ítem
         item = tree.selection()
@@ -33,25 +34,75 @@ def ver_detalle(parent, tree, conn):
 
         # Crear frames separados para cada categoría
         frames = {}
+        fields = {}  # Aquí almacenaremos las entradas y etiquetas
         for label in labels:
             frame = ctk.CTkFrame(main_frame, bg_color="#f5f5f5")
             frame.pack(fill="x", pady=5, padx=10)
             frames[label] = frame
 
-        # Crear las etiquetas y valores en cada frame
+        # Crear las etiquetas y campos (labels y Entry)
         for idx, label in enumerate(labels):
             field_label = ctk.CTkLabel(frames[label], text=f"{label}:", font=("Arial", 12, "bold"))
             field_label.pack(side="left", padx=10)
 
             # Mostrar el valor de cada campo en una etiqueta
-            field_value = ctk.CTkLabel(frames[label], text=detalle[idx+1], font=("Arial", 12), anchor="w", wraplength=600)
+            if label == "Núm.":
+                field_value = ctk.CTkLabel(frames[label], text=detalle[1], font=("Arial", 12), anchor="w", wraplength=600)
+            else:
+                field_value = ctk.CTkLabel(frames[label], text=detalle[idx + 1], font=("Arial", 12), anchor="w", wraplength=600)
+
             field_value.pack(side="left", padx=10)
+            fields[label] = field_value
 
-            # Si el campo es "Causa" o "Solución", aseguramos que el texto largo se ajuste correctamente
-            if label in ["Causa", "Solución"]:
-                field_value.configure(wraplength=600)  # Ajustar el largo máximo de cada línea
+        # Función para activar la edición de los campos
+        def habilitar_editar():
+            """Habilita la edición de los campos en la ventana actual."""
+            # Cambiar el texto del botón de "Editar" a "Guardar"
+            btn_editar.configure(text="Guardar", command=guardar_cambios)
 
-        # Botón de cerrar con estilo
+            # Cambiar las etiquetas a entradas
+            for label in labels:
+                current_field = fields[label]
+                current_value = current_field.cget("text")
+                current_field.destroy()  # Eliminar la etiqueta
+
+                if label == "Núm.":
+                    new_field = ctk.CTkEntry(frames[label], font=("Arial", 12), width=500)
+                    new_field.insert(0, current_value)  # Insertar el valor actual
+                    new_field.pack(side="left", padx=10)
+                else:
+                    new_field = ctk.CTkEntry(frames[label], font=("Arial", 12), width=500)
+                    new_field.insert(0, current_value)  # Insertar el valor actual
+                    new_field.pack(side="left", padx=10)
+
+                fields[label] = new_field  # Actualizar el campo
+
+        # Función para guardar los cambios
+        def guardar_cambios():
+            try:
+                # Obtener los nuevos valores de los campos editados
+                nuevos_valores = [fields[label].get() for label in labels]
+
+                # Actualizar la base de datos
+                cursor.execute('''
+                    UPDATE errores
+                    SET num = ?, pantalla = ?, descripcion = ?, causa = ?, solucion = ?
+                    WHERE id = ?
+                ''', (nuevos_valores[0], nuevos_valores[1], nuevos_valores[2], nuevos_valores[3], nuevos_valores[4], error_id))
+                conn.commit()
+
+                # Mostrar mensaje de éxito y cerrar la ventana de detalles
+                messagebox.showinfo("Éxito", "Los cambios se han guardado correctamente.")
+                detalle_win.destroy()  # Cerrar la ventana de detalles
+
+            except Exception as e:
+                messagebox.showerror("Error", f"Hubo un error al guardar los cambios: {e}")
+
+        # Botón para editar o guardar los cambios
+        btn_editar = ctk.CTkButton(main_frame, text="Editar", width=100, height=40, command=habilitar_editar)
+        btn_editar.pack(pady=10)
+
+        # Botón de cerrar la ventana de detalles
         cerrar_btn = ctk.CTkButton(main_frame, text="Cerrar", command=detalle_win.destroy, width=100, height=40)
         cerrar_btn.pack(pady=20)
 
@@ -68,4 +119,4 @@ def ver_detalle(parent, tree, conn):
     except Exception as e:
         print(f"Error al mostrar detalles: {e}")
         # Mostrar error en una ventana emergente
-        ctk.CTkMessageBox.showerror("Error", f"Hubo un error al cargar los detalles del error: {e}")
+        messagebox.showerror("Error", f"Hubo un error al cargar los detalles del error: {e}")

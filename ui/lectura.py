@@ -2,12 +2,12 @@ import customtkinter as ctk
 from tkinter import ttk
 import tkinter as tk
 import tkinter.messagebox as MessageBox
+from tkinter import messagebox
 import tkinter.filedialog as filedialog
 import sqlite3
-from database.database import insertar_error, eliminar_error, actualizar_error
+from database.database import insertar_error, eliminar_error, actualizar_error,obtener_error_por_id
 from utils.excel_loader import cargar_datos_desde_excel
 from ui.detalle import ver_detalle
-
 
 class LecturaFrame(ctk.CTkFrame):
     def __init__(self, master, conn, **kwargs):
@@ -53,6 +53,7 @@ class LecturaFrame(ctk.CTkFrame):
     def create_search_entry(self, search_frame):
         self.buscar_entry = ctk.CTkEntry(search_frame, width=200)
         self.buscar_entry.pack(side="left", padx=5)
+        self.buscar_entry.bind("<Return>", lambda event: self.buscar_errores())
 
     def create_search_button(self, search_frame):
         buscar_btn = ctk.CTkButton(search_frame, text="Buscar", width=80, command=self.buscar_errores)
@@ -130,12 +131,31 @@ class LecturaFrame(ctk.CTkFrame):
         
             self.tree.yview_moveto(0)
 
+    def editar_error_desde_detalle(self, ventana_detalle, error_id):
+        ventana_detalle.destroy()  # Cerrar ventana de detalle
+
+        error_data = obtener_error_por_id(self.conn, error_id)  # Obtener datos del error desde database.py
+        if not error_data:
+            MessageBox.showerror("Error", "No se pudo encontrar el error.")
+            return
+
+        self.editar_error(error_id)
+
+    def editar_error_desde_detalle(self, ventana_detalle, error_id):
+        """Cierra la ventana de detalles y abre la edición del error."""
+        ventana_detalle.destroy()  # Cerrar la ventana de detalles
+
+        error_data = obtener_error_por_id(self.conn, error_id)  # Obtener datos del error
+        if not error_data:
+            MessageBox.showerror("Error", "No se pudo encontrar el error.")
+            return
+
+        self.editar_error(error_id) 
+
     def show_menu(self):
         menu = tk.Menu(self, tearoff=0)
         menu.add_command(label="Agregar", command=self.abrir_ventana_agregar)
         menu.add_command(label="Eliminar", command=self.eliminar_error)
-        menu.add_command(label="Editar", command=self.editar_error)
-
         menu.post(self.winfo_rootx() + 35, self.winfo_rooty() + 55)
 
     def buscar_errores(self):
@@ -152,6 +172,9 @@ class LecturaFrame(ctk.CTkFrame):
             id_reg, num, pantalla, descripcion = reg
             tag = 'gris_claro' if idx % 2 == 0 else ''
             self.tree.insert("", "end", iid=str(id_reg), values=(num, pantalla, descripcion), tags=(tag,))
+            self.tree.tag_configure(f'negrita_{id_reg}', font=("Arial", 10, "bold"))
+            self.tree.item(str(id_reg), tags=(tag, f'negrita_{id_reg}'))
+            
 
     def abrir_detalle(self, event):
         # Verificar si ya hay una ventana de detalle abierta
@@ -246,7 +269,7 @@ class LecturaFrame(ctk.CTkFrame):
             except Exception as e:
                 MessageBox.showerror("Error", f"No se pudo eliminar el error.\n{str(e)}")
 
-    def editar_error(self):
+    def editar_error(self, error_id):
         selected_item = self.tree.selection()
         if not selected_item:
             MessageBox.showwarning("Selección requerida", "Por favor, selecciona un error para editar.")
@@ -300,5 +323,26 @@ class LecturaFrame(ctk.CTkFrame):
             return
 
         actualizar_error(self.conn, error_id, num, pantalla, descripcion, causa, solucion)
+
+        # Actualizar los campos de la ventana con los datos nuevos
+        self.entries["Núm."].delete(0, 'end')
+        self.entries["Pantalla"].delete(0, 'end')
+        self.entries["Descripción"].delete(0, 'end')
+        self.entries["Causa"].delete('1.0', 'end')
+        self.entries["Solución"].delete('1.0', 'end')
+
+        # Asignar los nuevos datos
+        self.entries["Núm."].insert(0, num)
+        self.entries["Pantalla"].insert(0, pantalla)
+        self.entries["Descripción"].insert(0, descripcion)
+        self.entries["Causa"].insert('1.0', causa)
+        self.entries["Solución"].insert('1.0', solucion)
+
+        # Mostrar un mensaje de éxito si se desea
+        messagebox.showinfo("Guardado", "Los cambios se han guardado correctamente")
+
         ventana.destroy()
         self.cargar_todos()
+
+
+    
