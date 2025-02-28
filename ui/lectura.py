@@ -121,7 +121,13 @@ class LecturaFrame(ctk.CTkFrame):
         for idx, reg in enumerate(registros):
             id_reg, num, pantalla, descripcion = reg
             tag = 'gris_claro' if idx % 2 == 0 else ''
+            # Aplicar negrita solo a la columna de "Pantalla"
             self.tree.insert("", "end", iid=str(id_reg), values=(num, pantalla, descripcion), tags=(tag,))
+            self.tree.tag_configure(f'negrita_{id_reg}', font=("Arial", 10, "bold"))
+        
+            # Asignar el tag 'negrita' al valor de 'Pantalla' en cada fila
+            self.tree.item(str(id_reg), tags=(tag, f'negrita_{id_reg}'))
+        
             self.tree.yview_moveto(0)
 
     def show_menu(self):
