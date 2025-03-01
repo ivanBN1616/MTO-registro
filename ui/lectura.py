@@ -8,15 +8,33 @@ import sqlite3
 from database.database import insertar_error, eliminar_error, actualizar_error,obtener_error_por_id
 from utils.excel_loader import cargar_datos_desde_excel
 from ui.detalle import ver_detalle
+from PIL import Image  # Para manejar imágenes en CTkImage
+import os  # Para manejar rutas relativas
 
 class LecturaFrame(ctk.CTkFrame):
     def __init__(self, master, conn, **kwargs):
         super().__init__(master, **kwargs)
         self.conn = conn
         self.entries = {}
+        self.iconos = self.cargar_iconos()
         self.create_widgets()
         self.cargar_todos()
         self.detalle_abierto = False
+        
+
+    def cargar_iconos(self):
+        """Carga las imágenes como CTkImage con rutas relativas."""
+        ruta_base = os.path.join(os.path.dirname(__file__), "../icon/")  # Ruta relativa
+        iconos = {
+            "menu": ctk.CTkImage(Image.open(os.path.join(ruta_base, "menu.png")), size=(25, 25)),
+            "buscar": ctk.CTkImage(Image.open(os.path.join(ruta_base, "zoom.png")), size=(25, 25)),
+            "excel": ctk.CTkImage(Image.open(os.path.join(ruta_base, "excel.png")), size=(25, 25)),
+            "refrescar": ctk.CTkImage(Image.open(os.path.join(ruta_base, "reload.png")), size=(25, 25)),
+            "base_datos": ctk.CTkImage(Image.open(os.path.join(ruta_base, "database.png")), size=(25, 25)),
+            "add": ctk.CTkImage(Image.open(os.path.join(ruta_base, "add.png")), size=(25, 25)),
+            "deleted": ctk.CTkImage(Image.open(os.path.join(ruta_base, "deleted.png")), size=(25, 25))
+        }
+        return iconos
 
     def create_widgets(self):
         self.create_search_panel()
@@ -40,7 +58,8 @@ class LecturaFrame(ctk.CTkFrame):
         # Estilo moderno para el botón
         menu_button = ctk.CTkButton(
             search_frame, 
-            text="☰", 
+            text="",
+            image=self.iconos["menu"], 
             width=30, 
             height=30, 
             command=self.show_menu,
@@ -59,7 +78,7 @@ class LecturaFrame(ctk.CTkFrame):
         self.db_selector = ctk.CTkOptionMenu(
             search_frame, 
             values=["lenze9300.db", "lenze8200.db", "lenze8400.db"], 
-            command=self.cambiar_base_datos
+            command=self.cambiar_base_datos,
         )
         self.db_selector.pack(side="left", padx=5)
 
@@ -73,16 +92,17 @@ class LecturaFrame(ctk.CTkFrame):
         self.buscar_entry.bind("<Return>", lambda event: self.buscar_errores())
 
     def create_search_button(self, search_frame):
-        buscar_btn = ctk.CTkButton(search_frame, text="Buscar", width=80, command=self.buscar_errores)
+        buscar_btn = ctk.CTkButton(search_frame, text="", width=30, command=self.buscar_errores, image=self.iconos["buscar"])
         buscar_btn.pack(side="left", padx=5)
 
     def create_excel_button(self, search_frame):
-        cargar_excel_btn = ctk.CTkButton(search_frame, text="Excel", width=80, command=self.cargar_desde_excel)
+        cargar_excel_btn = ctk.CTkButton(search_frame, font=("Arial", 12, "bold"), text="Excel", width=30, command=self.cargar_desde_excel, image=self.iconos["excel"])
         cargar_excel_btn.pack(side="left", padx=5)
 
     def create_refresh_button(self, search_frame):
-        boton_refrescar = ctk.CTkButton(search_frame, text="Refrescar", width=80, command=self.cargar_todos)
-        boton_refrescar.pack(side="left", padx=5, pady=5)
+        boton_refrescar = ctk.CTkButton(search_frame, text="", width=30, command=self.cargar_todos, image=self.iconos["refrescar"])
+        boton_refrescar.pack(side="right", padx=5, pady=5)
+
 
     def create_treeview(self):
         self.tree_frame = ctk.CTkFrame(self)
@@ -169,11 +189,20 @@ class LecturaFrame(ctk.CTkFrame):
 
         self.editar_error(error_id) 
 
+    import tkinter as tk
+
     def show_menu(self):
-        menu = tk.Menu(self, tearoff=0)
-        menu.add_command(label="Agregar", command=self.abrir_ventana_agregar)
-        menu.add_command(label="Eliminar", command=self.eliminar_error)
-        menu.post(self.winfo_rootx() + 35, self.winfo_rooty() + 55)
+        menu = tk.Menu(self, tearoff=0, bg="#333333", fg="white", activebackground="#555555", activeforeground="white")
+
+        menu.add_command(label="Agregar", command=self.abrir_ventana_agregar, font=("Arial", 10))
+        menu.add_separator()  # Línea separadora para mejor organización
+        menu.add_command(label="Eliminar", command=self.eliminar_error, font=("Arial", 10))
+
+        # Posición ajustada para que el menú no se desplace mal
+        x = self.winfo_rootx() + 10
+        y = self.winfo_rooty() + 40
+        menu.post(x, y)
+
 
     def buscar_errores(self):
         busqueda = self.buscar_entry.get()
@@ -361,6 +390,3 @@ class LecturaFrame(ctk.CTkFrame):
 
         ventana.destroy()
         self.cargar_todos()
-
-
-    

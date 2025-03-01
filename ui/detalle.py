@@ -98,13 +98,18 @@ def ver_detalle(parent, tree, conn):
             except Exception as e:
                 messagebox.showerror("Error", f"Hubo un error al guardar los cambios: {e}")
 
+        # Contenedor para los botones alineados horizontalmente
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.pack(pady=50)  # Aumentamos 'pady' para bajarlos más
+
         # Botón para editar o guardar los cambios
-        btn_editar = ctk.CTkButton(main_frame, text="Editar", width=100, height=40, command=habilitar_editar)
-        btn_editar.pack(pady=10)
+        btn_editar = ctk.CTkButton(button_frame, text="Editar", font=("Arial", 12, "bold"), width=100, height=40, command=habilitar_editar)
+        btn_editar.pack(side="left", padx=4)  # Reducimos 'padx' para juntarlos más
 
         # Botón de cerrar la ventana de detalles
-        cerrar_btn = ctk.CTkButton(main_frame, text="Cerrar", command=detalle_win.destroy, width=100, height=40)
-        cerrar_btn.pack(pady=20)
+        cerrar_btn = ctk.CTkButton(button_frame, text="Cerrar", font=("Arial", 12, "bold"), width=100, height=40, command=detalle_win.destroy)
+        cerrar_btn.pack(side="left", padx=4)  # Usamos 'side="left"' para mantenerlos juntos
+
 
         # Asegurar que la ventana de detalles esté al frente
         detalle_win.lift()  # Asegura que la ventana emergente esté al frente
