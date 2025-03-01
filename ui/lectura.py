@@ -35,7 +35,24 @@ class LecturaFrame(ctk.CTkFrame):
         self.create_refresh_button(search_frame)
 
     def create_menu_button(self, search_frame):
-        menu_button = ctk.CTkButton(search_frame, text="☰", width=30, height=30, command=self.show_menu)
+        fg_color = ctk.ThemeManager.theme["CTkButton"]["fg_color"]
+        hover_color = ctk.ThemeManager.theme["CTkButton"]["hover_color"]
+        # Estilo moderno para el botón
+        menu_button = ctk.CTkButton(
+            search_frame, 
+            text="☰", 
+            width=30, 
+            height=30, 
+            command=self.show_menu,
+            font=("Arial", 18),   # Fuente más moderna y grande
+            fg_color=fg_color,  # Color de fondo personalizado
+            hover_color=hover_color,  # Color al pasar el ratón
+            corner_radius=10,  # Bordes redondeados
+            border_width=0,  # Sin borde
+            text_color="white"  # Color del texto
+    )
+    
+        # Empaquetar el botón
         menu_button.pack(side="left", padx=5)
 
     def create_db_selector(self, search_frame):
@@ -188,9 +205,10 @@ class LecturaFrame(ctk.CTkFrame):
             self.detalle_abierto = True  # Marcar que la ventana de detalle está abierta
             ver_detalle(self, self.tree, self.conn, error_id, self.cerrar_detalle)
 
-    def cerrar_detalle(self):
+    def cerrar_detalle(self, ventana):
         # Esta función se llama cuando se cierra la ventana de detalle
         self.detalle_abierto = False  # Marcar que la ventana de detalle se ha cerrado
+        ventana.destroy()
     
     def abrir_ventana_agregar(self):
         ventana = ctk.CTkToplevel(self.master)
