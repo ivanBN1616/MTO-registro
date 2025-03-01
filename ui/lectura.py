@@ -24,7 +24,7 @@ class LecturaFrame(ctk.CTkFrame):
 
     def cargar_iconos(self):
         """Carga las imágenes como CTkImage con rutas relativas."""
-        ruta_base = os.path.join(os.path.dirname(__file__), "../icon/")  # Ruta relativa
+        ruta_base = os.path.join(os.path.dirname(__file__), "../icons/")  # Ruta relativa
         iconos = {
             "menu": ctk.CTkImage(Image.open(os.path.join(ruta_base, "menu.png")), size=(25, 25)),
             "buscar": ctk.CTkImage(Image.open(os.path.join(ruta_base, "zoom.png")), size=(25, 25)),
