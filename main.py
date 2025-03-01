@@ -1,6 +1,9 @@
 import customtkinter as ctk
 from database.db_manager import init_db
 from ui.lectura import LecturaFrame
+import sys
+import os
+from PIL import Image
 
 def main():
     # Configuración de CustomTkinter
@@ -23,3 +26,25 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# Ruta del icono dependiendo si estamos en el ejecutable empaquetado o en modo desarrollo
+if getattr(sys, 'frozen', False):
+    # Si estamos en el ejecutable empaquetado
+    icon_path = os.path.join(sys._MEIPASS, "icons", "paros.ico")
+else:
+    # Si estamos en el entorno de desarrollo (script)
+    icon_path = "icons/paros.ico"
+
+
+
+def cargar_iconos(self):
+    # Detecta si la aplicación está ejecutándose como un EXE
+    ruta_base = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
+
+    return {
+        "menu": ctk.CTkImage(Image.open(os.path.join(ruta_base, "icons", "menu.png")), size=(25, 25)),
+        # Aquí puedes agregar más iconos según lo necesites
+    }
+
+
